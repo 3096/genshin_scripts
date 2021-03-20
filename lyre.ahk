@@ -13,6 +13,8 @@ global X_COORDS  := [994,    670,    994,    1316,   2448,   2126,   2448,   276
 global Y_COORDS  := [545,    860,    1185,   860,    545,    860,    1184,   860]
 
 global ACTIVATION_COLOR := 0x40E0FF
+global KEY_PRESS_CYCLE_DURATION := 2
+global CYCLE_SLEEP_DURATION := 5
 
 
 IsSimilarColor(color0, color1, tolerance)
@@ -25,11 +27,12 @@ IsSimilarColor(color0, color1, tolerance)
     g1 := (color1 & 0xFF00) >> 8
     b1 := (color1 & 0xFF0000) >> 16,
 
-    distance := sqrt((r0 - r1)**2 + (g0 - g1)**2 + (b1 - b0)**2)
+    distance := (r0 - r1)**2 + (g0 - g1)**2 + (b1 - b0)**2
     return distance < tolerance
 }
 
 F8::
+    curKeyPressCycles := []
     Loop {
         ; check for stopping
         if(GetKeyState("Space", "P")) {
@@ -38,13 +41,22 @@ F8::
 
         for i, keyCode in KEY_CODES
         {
-            PixelGetColor, pixelColor, X_COORDS[i], Y_COORDS[i]
-            if(IsSimilarColor(ACTIVATION_COLOR, pixelColor, 10)) {
-                Send {%keyCode%}
+            if (curKeyPressCycles[i] > 0) {
+                curKeyPressCycles[i] -= 1
+                if (curKeyPressCycles[i] <= 0) {
+                    Send {%keyCode% up}
+                }
+
+            } else {
+                PixelGetColor, pixelColor, X_COORDS[i], Y_COORDS[i]
+                if(IsSimilarColor(ACTIVATION_COLOR, pixelColor, 3200)) {
+                    Send {%keyCode% down}
+                    curKeyPressCycles[i] := KEY_PRESS_CYCLE_DURATION
+                }
             }
         }
 
-        Sleep, 5
+        Sleep, CYCLE_SLEEP_DURATION
     }
 
     return
