@@ -79,8 +79,8 @@ class LyrePlayer:
             self.root_note = default_if_invalid(song_config, "root_note", int, None)
             self.use_auto_root = self.root_note is None
             if self.use_auto_root:
-                self.auto_root_lowest = default_if_invalid(song_config, "auto_root_lowest", int, 40)
-                self.auto_root_highest = default_if_invalid(song_config, "auto_root_highest", int, 80)
+                self.auto_root_lowest = default_if_invalid(song_config, "auto_root_lowest", int, 48)
+                self.auto_root_highest = default_if_invalid(song_config, "auto_root_highest", int, 84)
                 self.auto_root_use_count = default_if_invalid(song_config, "auto_root_use_count", bool, True)
                 self.auto_root_channels = default_if_invalid(song_config, "auto_root_use_channels", list,
                                                              self.channel_filter)
@@ -210,6 +210,7 @@ class LyrePlayer:
                 if key := note_key_map.get_key(msg.note):
                     keyboard.release(key)
 
+        self.play_task_active = False
         print("finished playing")
 
     def on_press(self, key):
