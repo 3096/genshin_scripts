@@ -2,6 +2,7 @@ import asyncio
 import ctypes
 import json
 import os
+import time
 from typing import List
 
 import mido
@@ -29,7 +30,6 @@ START_COMBO_KEY = [pynput.keyboard.Key.tab]
 STOP_KEY_COMBO = [pynput.keyboard.Key.space]
 RELOAD_CONFIG_KEY = pynput.keyboard.KeyCode.from_char('`')
 CONFIG_FILE_NAME = "midi_config.json"
-KEY_PRESS_DURATION = 0.01
 
 
 class NoteKeyMap:
@@ -77,6 +77,8 @@ class LyrePlayer:
             self.channel_filter = default_if_invalid(song_config, "channel_filter", list, [])
             self.track_filter = default_if_invalid(song_config, "track_filter", list, [])
             self.no_hold = default_if_invalid(song_config, "no_hold", bool, True)
+            if self.no_hold:
+                self.key_press_duration = default_if_invalid(song_config, "key_press_duration", float, 0.01)
             self.skip_start_time = default_if_invalid(song_config, "skip_start", (int, float), 0)
             self.root_note = default_if_invalid(song_config, "root_note", int, None)
             self.use_auto_root = self.root_note is None
@@ -186,7 +188,7 @@ class LyrePlayer:
         # play
         print('start playing')
         fast_forward_time = song_config.skip_start_time
-        sleep_debt = 0
+        last_clock = time.time()
         for msg in mid:
             # check for stop
             if not self.play_task_active:
@@ -200,13 +202,8 @@ class LyrePlayer:
                 fast_forward_time -= msg.time
                 continue
             elif msg.time > 0:
-                # msg sleep
-                if song_config.no_hold:
-                    sleep_debt_repay = min(sleep_debt, msg.time)
-                    sleep_debt -= sleep_debt_repay
-                    await asyncio.sleep(msg.time - sleep_debt_repay)
-                else:
-                    await asyncio.sleep(msg.time)
+                await asyncio.sleep(msg.time - (time.time() - last_clock))
+                last_clock += msg.time
 
             # press keys
             if msg.type == "note_on" \
@@ -214,9 +211,8 @@ class LyrePlayer:
                 if key := note_key_map.get_key(msg.note):
                     keyboard.press(key)
                     if song_config.no_hold:
-                        await asyncio.sleep(KEY_PRESS_DURATION)
+                        await asyncio.sleep(song_config.key_press_duration)
                         keyboard.release(key)
-                        sleep_debt += KEY_PRESS_DURATION
 
             elif not song_config.no_hold and msg.type == "note_off" \
                     and (len(song_config.channel_filter) == 0 or msg.channel in song_config.channel_filter):
