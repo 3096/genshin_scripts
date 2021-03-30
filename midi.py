@@ -3,6 +3,7 @@ import ctypes
 import json
 import os
 import time
+import traceback
 from typing import List
 
 import mido
@@ -29,7 +30,8 @@ LICENSE = """
 START_COMBO_KEY = [pynput.keyboard.Key.tab]
 STOP_KEY_COMBO = [pynput.keyboard.Key.space]
 RELOAD_CONFIG_KEY = pynput.keyboard.KeyCode.from_char('`')
-CONFIG_FILE_NAME = "midi_config.json"
+DEFAULT_CONFIG_FILE_PATH = "midi_config.json"
+TEMPLATE_DEFAULT_PATH_MSG = "put the path to your midi file here"
 
 
 class NoteKeyMap:
@@ -116,7 +118,7 @@ class LyrePlayer:
                     self.song_key_dict[pynput.keyboard.KeyCode.from_char(song_config["key"])] \
                         = self.SongConfig(song_config)
                     print(f"{song_config['key']} - {os.path.basename(song_config['file'])}")
-                else:
+                elif song_config["file"] != TEMPLATE_DEFAULT_PATH_MSG:
                     print(f"file not found: {song_config['file']}")
 
         print(f"loaded {len(self.song_key_dict)} songs from config!")
@@ -197,11 +199,11 @@ class LyrePlayer:
                     keyboard.release(key)
                 return
 
-            # skip if fast forward
-            if fast_forward_time > 0:
+            if fast_forward_time > 0:  # skip if fast forward
                 fast_forward_time -= msg.time
                 continue
             elif msg.time > 0:
+                # sleep msg.time based on time.time()
                 await asyncio.sleep(msg.time - (time.time() - last_clock))
                 last_clock += msg.time
 
@@ -250,13 +252,18 @@ class LyrePlayer:
 
     def start(self):
         pynput.keyboard.Listener(on_press=self.on_press, on_release=self.on_release).start()
-        self.playing_event_loop.run_forever()
+        self.playing_event_loop.run_forever()  # thank you forever
 
 
 if __name__ == "__main__":
     print(LICENSE)
-    if ctypes.windll.shell32.IsUserAnAdmin():
-        LyrePlayer(CONFIG_FILE_NAME).start()
-    else:
-        print("Admin mode is required, please run as administrator and try again...")
-        input()
+
+    try:
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            LyrePlayer(DEFAULT_CONFIG_FILE_PATH).start()
+        else:
+            print("Admin mode is required, please run as administrator and try again...")
+    except:
+        traceback.print_exc()
+    finally:
+        input("press any key to exit...")
