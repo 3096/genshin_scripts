@@ -1,3 +1,25 @@
+; "The AFKatch" v0.69
+; Copyright (C) 2021  3096
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU Affero General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+;
+; This program is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+; GNU Affero General Public License for more details.
+;
+; You should have received a copy of the GNU Affero General Public License
+; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+; Usage: Install ahk and right click script to run as admin.
+; For every catch, press Ctrl F after you cast your rod (make sure the left click icon has changed)
+; You need the config for your specific resolution. Delete configs for other resolution under "resolution configs".
+
+
 #NoEnv
 #Warn
 SendMode Input
@@ -16,7 +38,6 @@ global AUTO_FISH_CAUGHT_TIMEOUT := 10
 ; AUTO_FISH_TARGET_GLOW      - the target zone yellow glow
 ; AUTO_FISH_CARET_GLOW       - the caret (the pointer that moves left and right) yellow glow
 ; AUTO_FISH_CARET_WIDTH      - the width of caret (extended part at top and bottom)
-; AUTO_FISH_CARET_LEFT_PAD   - how much room to leave when sticking the caret to the left of target zone
 ; AUTO_FISH_BAR_TARGET_DROP  - pixel distance from caret glow to target zone glow
 
 global AUTO_FISH_SEARCH_CONFIRMATION_THRESHOLD := 5  ; how many times to "double check" searched bar position
@@ -24,6 +45,8 @@ global AUTO_FISH_TARGET_GLOW_COLOR := 0xC0FFFF
 global AUTO_FISH_CARET_GLOW_COLOR := 0xBEFFFF
 global AUTO_FISH_GLOW_COLOR_VARIANCE := 3  ; this value should ideally be 0, but just in case
 global AUTO_FISH_REEL_EARLY_VARIANCE := 64  ; decrease if you're not reeling, increase if you're reeling too early
+
+; resolution configs
 
 ; 3840x2160
 global AUTO_FISH_RESOLUTION_W := 3840
@@ -37,7 +60,6 @@ global AUTO_FISH_REEL_EARLY_X := 3246
 global AUTO_FISH_REAL_EARLY_Y := 2000
 
 global AUTO_FISH_CARET_WIDTH := 22
-global AUTO_FISH_CARET_LEFT_PAD := 60
 global AUTO_FISH_BAR_TARGET_DROP := 8
 
 ; 3440x1440
@@ -52,7 +74,6 @@ global AUTO_FISH_REEL_EARLY_X := 2948
 global AUTO_FISH_REAL_EARLY_Y := 1334
 
 global AUTO_FISH_CARET_WIDTH := 14
-global AUTO_FISH_CARET_LEFT_PAD := 40
 global AUTO_FISH_BAR_TARGET_DROP := 6
 
 ; 1920x1080
@@ -67,7 +88,6 @@ global AUTO_FISH_REEL_EARLY_X := 1623
 global AUTO_FISH_REAL_EARLY_Y := 1000
 
 global AUTO_FISH_CARET_WIDTH := 11
-global AUTO_FISH_CARET_LEFT_PAD := 30
 global AUTO_FISH_BAR_TARGET_DROP := 4
 
 
@@ -87,9 +107,9 @@ AutoFish() {
         MsgBox, Current resolution is not configured.
         Return
     }
-    
+
     searchRightX := clientW - AUTO_FISH_SEARCH_LEFT_X
-    caretAvoidanceThreshold := AUTO_FISH_CARET_WIDTH * 2
+    caretPad := AUTO_FISH_CARET_WIDTH / 2
     caretUpperY := -1
     caretLowerY := -1
     barTargetUpperY := -1
@@ -164,28 +184,35 @@ AutoFish() {
         }
 
         ; search color for caret/target positions
+        failedToFind := false
+
         PixelSearch, curCaretX, Py
             , AUTO_FISH_SEARCH_LEFT_X, caretUpperY
             , searchRightX, caretLowerY
             , AUTO_FISH_CARET_GLOW_COLOR, AUTO_FISH_GLOW_COLOR_VARIANCE, Fast
-        if (ErrorLevel) {
-            curTimeOutCycleCount := curTimeOutCycleCount + 1
-            Continue
-        }
+        failedToFind := ErrorLevel or failedToFind
 
-        PixelSearch, curBarTargetX, Py
+        PixelSearch, curBarTargetXLeft, Py
             , AUTO_FISH_SEARCH_LEFT_X, barTargetUpperY
             , searchRightX, barTargetLowerY
             , AUTO_FISH_TARGET_GLOW_COLOR, AUTO_FISH_GLOW_COLOR_VARIANCE, Fast
-        if (ErrorLevel) {
+        failedToFind := ErrorLevel or failedToFind
+
+        PixelSearch, curBarTargetXRight, Py
+            , searchRightX, barTargetUpperY
+            , AUTO_FISH_SEARCH_LEFT_X, barTargetLowerY
+            , AUTO_FISH_TARGET_GLOW_COLOR, AUTO_FISH_GLOW_COLOR_VARIANCE, Fast
+        failedToFind := ErrorLevel or failedToFind
+
+        if (failedToFind) {
             curTimeOutCycleCount := curTimeOutCycleCount + 1
             Continue
         }
- 
+
         curTimeOutCycleCount := 0
 
         ; hold or release based on searched coords
-        if ((curBarTargetX + AUTO_FISH_CARET_LEFT_PAD) > curCaretX) {
+        if ((curBarTargetXLeft + curBarTargetXRight) / 2 > curCaretX + AUTO_FISH_CARET_WIDTH) {
             Send, {Click down}
         } else {
             Send, {Click up}
